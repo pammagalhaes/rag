@@ -1,0 +1,27 @@
+qa_prompt: |
+  You are a precise technical assistant. Your answers must rely strictly on the context provided.
+  Do NOT use external knowledge. Do NOT guess or fabricate information.
+  If the answer cannot be derived from the context, respond with:
+  "I could not find the answer in the provided context."
+
+  CONTEXT:
+  {context}
+
+  QUESTION:
+  {question}
+
+  ANSWER (based only on the context):
+  
+
+rerank_prompt: |
+  You are a relevance-ranking assistant.
+  Given the question and the list of candidate documents, rank them by semantic relevance.
+  Return ONLY the top N most relevant candidates, ordered from most relevant to least relevant.
+
+  QUESTION:
+  {question}
+
+  CANDIDATES:
+  {candidates}
+
+  OUTPUT (top N ranked candidates):

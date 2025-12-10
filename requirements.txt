@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+pypdf
+python-pptx
+pytesseract
+Pillow
+sentence-transformers
+faiss-cpu
+whoosh
+transformers
+torch
+diskcache
+slowapi
+langchain
+langchain-text-splitter

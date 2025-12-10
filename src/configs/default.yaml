@@ -1,0 +1,30 @@
+app:
+  host: "0.0.0.0"
+  port: 8000
+  debug: true
+
+
+model:
+  embed_model: "sentence-transformers/all-MiniLM-L6-v2"
+  gen_model: "google/flan-t5-base"
+  embedding_batch_size: 32
+
+
+vectorstore:
+  faiss_index_path: "data/index/faiss.index"
+  faiss_meta_path: "data/index/faiss_meta.pkl"
+
+
+retrieval:
+  semantic_k: 5
+  bm25_k: 5
+  hybrid_top_k: 5
+
+
+api:
+  rate_limit_per_minute: 60
+  max_upload_mb: 50
+
+
+logging:
+  level: INFO

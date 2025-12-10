@@ -1,5 +1,6 @@
 fastapi
 uvicorn[standard]
+python-multipart
 pypdf
 python-pptx
 pytesseract
@@ -11,5 +12,6 @@ transformers
 torch
 diskcache
 slowapi
-langchain
-langchain-text-splitter
+langchain>=0.1.0
+langchain-text-splitters>=0.0.1
+langchain-community>=0.0.1

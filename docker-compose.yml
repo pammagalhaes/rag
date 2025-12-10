@@ -1,4 +1,3 @@
-version: "3.8"
 services:
   backend:
     build:
@@ -6,9 +5,10 @@ services:
       dockerfile: backend/Dockerfile
     volumes:
       - ./data:/app/data
-      - ./backend:/app
+      - ./src:/app/src
+      - ./backend:/app/backend
     ports:
-      - "8000:8000"
+      - "8001:8000"
     environment:
       - ENV=dev
 

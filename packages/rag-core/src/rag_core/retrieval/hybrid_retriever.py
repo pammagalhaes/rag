@@ -1,6 +1,6 @@
 from typing import List
-from src.llm.base import ModelClient
-from src.vectorstore.faiss_store import FaissStore
+from rag_core.llm.base import ModelClient
+from rag_core.vectorstore.faiss_store import FaissStore
 from whoosh.qparser import MultifieldParser
 import whoosh.index as whoosh_index
 

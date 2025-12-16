@@ -2,22 +2,31 @@ services:
   backend:
     build:
       context: .
-      dockerfile: backend/Dockerfile
+      dockerfile: apps/backend/Dockerfile
     volumes:
       - ./data:/app/data
+<<<<<<< HEAD
       - ./src:/app/src
       - ./backend:/app/backend
     ports:
       - "8001:8000"
+=======
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+>>>>>>> e163336 (refactor: project restructure and env-based configuration)
     environment:
       - ENV=dev
 
   frontend:
     build:
       context: .
-      dockerfile: frontend/Dockerfile
+      dockerfile: apps/frontend/Dockerfile
+    environment:
+      - API_URL=http://backend:8000
     volumes:
-      - ./frontend:/app
+      - ./apps/frontend:/app
     ports:
       - "8501:8501"
     depends_on:

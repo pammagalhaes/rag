@@ -11,15 +11,11 @@ transformers
 torch
 diskcache
 slowapi
-<<<<<<< HEAD:backend/requirements.txt
 langchain>=0.1.0
 langchain-text-splitters>=0.0.1
 langchain-community>=0.0.1
-=======
 langchain
 python-multipart
 langchain-text-splitters
 openai>=1.0.0
 
-
->>>>>>> e163336 (refactor: project restructure and env-based configuration):apps/backend/requirements.txt

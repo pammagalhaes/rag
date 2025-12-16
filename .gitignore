@@ -12,9 +12,16 @@ dist/
 *.egg-info/
 .eggs/
 
-# Virtual environments
+# env
+.env
+.venv
 venv/
-.env/
-.venv/
 
+# data
+data/cache/
 data/index/
+data/processed/
+
+# python
+__pycache__/
+*.pyc

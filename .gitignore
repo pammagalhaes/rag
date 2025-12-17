@@ -13,7 +13,7 @@ dist/
 .eggs/
 
 # env
-.env
+#.env
 .venv
 venv/
 *.env.secrets

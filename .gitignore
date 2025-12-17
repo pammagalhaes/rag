@@ -16,6 +16,7 @@ dist/
 .env
 .venv
 venv/
+*.env.secrets
 
 # data
 data/cache/

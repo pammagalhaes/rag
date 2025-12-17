@@ -5,17 +5,12 @@ services:
       dockerfile: apps/backend/Dockerfile
     volumes:
       - ./data:/app/data
-<<<<<<< HEAD
       - ./src:/app/src
       - ./backend:/app/backend
-    ports:
-      - "8001:8000"
-=======
     ports:
       - "8000:8000"
     env_file:
       - .env
->>>>>>> e163336 (refactor: project restructure and env-based configuration)
     environment:
       - ENV=dev
 

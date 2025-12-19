@@ -5,6 +5,7 @@ pypdf
 python-pptx
 pytesseract
 Pillow
+pytest
 faiss-cpu
 whoosh
 transformers

@@ -1,24 +1,32 @@
-name: CI
+name: CI Backend
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
+    branches: [ main ]
+    paths:
+      - "apps/backend/**"
+      - "packages/rag-core/**"
+  push:
     branches: [ main ]
 
 jobs:
-  test-build:
+  test-and-build:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
-      - name: Install deps
+
+      - name: Install dependencies
         run: |
           pip install -r apps/backend/requirements.txt
+
       - name: Run tests
-        run: pytest -q || true
-      - name: Build docker
+        run: pytest
+
+      - name: Build Docker image
         run: docker build -t rag-backend -f apps/backend/Dockerfile .

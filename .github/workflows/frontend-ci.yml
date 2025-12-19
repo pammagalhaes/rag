@@ -1,24 +1,31 @@
-name: CI
+name: CI Frontend
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
+    branches: [ main ]
+    paths:
+      - "apps/frontend/**"
+  push:
     branches: [ main ]
 
 jobs:
-  test-build:
+  test-and-build:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
-      - name: Install deps
+
+      - name: Install dependencies
         run: |
           pip install -r apps/frontend/requirements.txt
+
       - name: Run tests
-        run: pytest -q || true
-      - name: Build docker
-        run: docker build -t rag-backend -f apps/frontend/Dockerfile .
+        run: pytest || exit 0
+
+      - name: Build Docker image
+        run: docker build -t rag-frontend -f apps/frontend/Dockerfile .

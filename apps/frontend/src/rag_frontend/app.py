@@ -5,7 +5,7 @@ import os
 
 
 st.set_page_config(page_title="RAG Agentic Demo")
-st.title("RAG Agentic — Demo (Streamlit)")
+st.title("RAG Agentic")
 
 API_URL = st.secrets.get("API_URL", os.getenv("API_URL", "http://backend:8000"))
 

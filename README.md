@@ -97,7 +97,7 @@ python -m uvicorn src.api.main:app --reload
 ```
 
 **API Screenshot**
-[Insert API screenshot here]
+![descrição](swagger.png)
 
 ### Running Streamlit App
 ```bash
@@ -105,7 +105,7 @@ streamlit run app/streamlit_app.py
 ```
 
 **Streamlit Interface**
-[Insert Streamlit screenshot here]
+![descrição](rag-interface.png)
 
 ## API Documentation
 
@@ -159,10 +159,7 @@ Features include:
 [Insert performance data and screenshots]
 
 ### Example Responses
-[Insert example query/response pairs]
-
-### System Performance
-[Insert Streamlit and API performance screenshots]
+![descrição](rag-working.png)
 
 ## Libraries Used
 
@@ -205,8 +202,6 @@ Features include:
 - **Score Fusion**: Weighted combination of vector and lexical scores
 - **Re-ranking**: Result refinement through multiple relevance strategies
 
-## Contributing
-Contributions are welcome. Please create a pull request with your changes.
 
 
 ## License

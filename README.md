@@ -1,5 +1,5 @@
 
-```markdown
+
 # RAG Agentic Project
 
 ## Table of Contents
@@ -212,3 +212,4 @@ Contributions are welcome. Please create a pull request with your changes.
 ## License
 MIT License
 ```
+

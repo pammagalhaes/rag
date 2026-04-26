@@ -120,6 +120,7 @@ docker-compose up --build
 ### Access the application
 **Frontend (Streamlit):**
 http://localhost:8501
+
 **Backend (FastAPI Docs):**
 http://localhost:8000/docs
 

@@ -106,9 +106,11 @@ cp .env.example .env
 ```
 
 Then edit .env:
+```bash
 OPENAI_API_KEY=your_key_here
-API_URL=http://backend:8000
 
+API_URL=http://backend:8000
+```
 ## Usage
 
 ### Run with Docker

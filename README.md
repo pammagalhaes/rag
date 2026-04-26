@@ -20,42 +20,65 @@ This project implements a Retrieval-Augmented Generation (RAG) system with agent
 ## Project Structure
 ```
 rag-agentic/
-├── README.md
-├── requirements.txt
-├── .env
-├── src/
-│   ├── __init__.py
-│   ├── api/
-│   │   ├── __init__.py
-│   │   ├── main.py
-│   │   └── routes.py
-│   ├── core/
-│   │   ├── __init__.py
-│   │   ├── rag_engine.py
-│   │   └── agent.py
-│   ├── utils/
-│   │   ├── __init__.py
-│   │   └── helpers.py
-│   └── config.py
+├── apps/
+│   ├── backend/
+│   │   ├── src/
+│   │   │   └── rag_backend/
+│   │   │       ├── api/
+│   │   │       ├── services/
+│   │   │       └── main.py
+│   │   ├── configs/
+│   │   ├── Dockerfile
+│   │   └── requirements.txt
+│   │
+│   ├── frontend/
+│   │   ├── src/
+│   │   │   └── rag_frontend/
+│   │   │       └── app.py
+│   │   ├── Dockerfile
+│   │   └── requirements.txt
+│   │
+│   └── tests/
+│
+├── packages/
+│   └── rag-core/
+│       └── src/
+│           └── rag_core/
+│               ├── agents/
+│               ├── ingestion/
+│               ├── retrieval/
+│               ├── llm/
+│               └── vectorstore/
+│
 ├── data/
-│   ├── documents/
-│   └── embeddings/
-├── app/
-│   ├── streamlit_app.py
-│   └── pages/
-└── tests/
-    ├── __init__.py
-    └── test_rag.py
+│   └── raw/                
+├── docker-compose.yml
+├── .env.example
+└── README.md
 ```
 
 ## Features
 - **Document Retrieval**: Efficient semantic search using embeddings
-- **Agentic System**: Intelligent agent that can reason and make decisions
+- **Agentic Layer**: Orchestrates retrieval and LLM components to enable context-aware responses and multi-step reasoning
 - **REST API**: FastAPI-based API for integration
 - **Streamlit UI**: User-friendly interface for interaction
 - **Multi-document Support**: Process multiple documents simultaneously
 
 ## Architecture
+
+### RAG Architecture
+This project follows a modular architecture:
+
+- **rag_backend** → FastAPI service handling API requests
+- **rag_frontend** → Streamlit interface
+- **rag_core** → Core RAG logic (retrieval, LLM, agents)
+
+This separation allows:
+
+- reusability of core logic
+- independent deployment
+- cleaner scaling
+
 
 ### RAG Engine
 The RAG engine handles document embedding and retrieval using vector similarity search.
@@ -69,40 +92,37 @@ FastAPI server exposing endpoints for RAG and agentic operations.
 ### Streamlit App
 Interactive web interface for end-users.
 
-## Setup & Installation
+## Quick Start (Recommended)
 
-### Prerequisites
-- Python 3.9+
-- pip or conda
-
-### Installation Steps
+### Clone the repository
 ```bash
 git clone <repository-url>
 cd rag-agentic
-pip install -r requirements.txt
 ```
 
 ### Environment Variables
-Create `.env` file:
+```bash
+cp .env.example .env
 ```
+
+Then edit .env:
 OPENAI_API_KEY=your_key_here
-DATABASE_URL=your_db_url
-```
+API_URL=http://backend:8000
 
 ## Usage
 
-### Running the API
+### Run with Docker
 ```bash
-python -m uvicorn src.api.main:app --reload
+docker-compose up --build
 ```
+### Access the application
+**Frontend (Streamlit):**
+http://localhost:8501
+**Backend (FastAPI Docs):**
+http://localhost:8000/docs
 
 **API Screenshot**
 ![descrição](swagger.png)
-
-### Running Streamlit App
-```bash
-streamlit run app/streamlit_app.py
-```
 
 **Streamlit Interface**
 ![descrição](rag-interface.png)
@@ -111,30 +131,41 @@ streamlit run app/streamlit_app.py
 
 ### Endpoints
 
-#### POST /query
-Submits a query to the RAG system.
+#### POST /upload
+Upload documents for indexing.
+Request:
+
+multipart/form-data (file)
+
+#### POST /chat
+Conversational query with memory.
 ```json
 {
-  "query": "Your question here",
-  "top_k": 5
+   "question": "What is this document about?",
+  "history": []
 }
 ```
 
-#### POST /agent
-Executes agentic workflow.
+#### POST /ask
+Simple query without conversation history.
 ```json
 {
-  "task": "Your task description"
+  "question": "Explain machine learning"
 }
 ```
+
+#### GET /health
+Check if the API is running.
 
 ## Streamlit Application
 
 Features include:
-- Document upload
-- Query interface
-- Response visualization
-- Conversation history
+- Document ingestion (PDF, TXT, PPTX, images)
+- Semantic search with embeddings
+- Hybrid retrieval (vector + lexical)
+- Conversational RAG with memory
+- Agentic orchestration layer
+- Streamlit-based UI
 
 ## Strategies
 

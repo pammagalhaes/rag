@@ -30,4 +30,20 @@ class RAGService:
         )
 
     def answer(self, question: str) -> str:
-        return self.agent.run(question)
+        docs = self.retriever.hybrid(question, k=5)
+
+        if not docs:
+            return "I could not find the answer in the provided context."
+
+        context = "\n\n".join(
+            f"Source: {doc.get('source', 'unknown')}\nText: {doc.get('text', '')}"
+            for doc in docs
+        )
+
+        prompt = self.templates["qa_prompt"].format(
+            context=context,
+            question=question
+        )
+
+        answer = self.model.generate(prompt)
+        return answer.strip() or "I could not find the answer in the provided context."

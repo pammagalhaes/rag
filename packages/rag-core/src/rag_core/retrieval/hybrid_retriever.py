@@ -35,18 +35,16 @@ class HybridRetriever:
         return results
 
     # -----------------------------
-    # Fuzzy Keyword Search
+    # Keyword Search (exact / partial matches)
     # -----------------------------
-    def fuzzy_search(self, query: str, k: int = 10):
+    def keyword_search(self, query: str, k: int = 10):
 
         idx = whoosh_index.open_dir(self.whoosh_index_dir)
 
-        # adiciona ~ ao final de cada termo
-        fuzzy_query = " ".join([f"{term}~" for term in query.split()])
-
+    
         qp = MultifieldParser(["content"], schema=idx.schema)
 
-        q = qp.parse(fuzzy_query)
+        q = qp.parse(query)
 
         with idx.searcher() as s:
 
@@ -103,11 +101,11 @@ class HybridRetriever:
 
         semantic_results = self.semantic_search(query, k=k)
 
-        fuzzy_results = self.fuzzy_search(query, k=k)
+        keyword_results = self.keyword_search(query, k=k)
 
         fused = self.reciprocal_rank_fusion([
             semantic_results,
-            fuzzy_results
+            keyword_results
         ])
 
         return fused[:k]

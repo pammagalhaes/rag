@@ -3,6 +3,10 @@ import glob
 import math
 from typing import List
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from rag_core.ingestion.loaders import load_file
 from rag_core.llm.transformers_client import TransformersClient
 from rag_core.vectorstore.faiss_store import FaissStore

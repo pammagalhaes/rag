@@ -1,4 +1,5 @@
-from typing import List
+from typing import List, Dict
+from collections import defaultdict
 from rag_core.llm.base import ModelClient
 from rag_core.vectorstore.faiss_store import FaissStore
 from whoosh.qparser import MultifieldParser
@@ -27,23 +28,22 @@ class HybridRetriever:
             hits = s.search(q, limit=k)
             return [{"source": h["source"], "text": h["content"]} for h in hits]
 
+    def reciprocal_rank_fusion(self, rankings: List[List[Dict]], k: int = 60):
+        scores = defaultdict(float)
+        documents = {}
+
+        for ranking in rankings:
+            for rank, doc in enumerate(ranking):
+                doc_id = (doc.get("source"), doc.get("text")[:100])
+                documents[doc_id] = doc
+                scores[doc_id] += 1 / (k + rank + 1)
+
+        sorted_docs = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+        return [documents[doc_id] for doc_id, _ in sorted_docs]
 
     def hybrid(self, query: str, k: int = 5):
         sem = self.semantic_search(query, k=k)
         kw = self.keyword_search(query, k=k)
-
-        seen = set()
-        merged = []
-
-        for r in sem + kw:
-            key = (r.get("source"), r.get("text")[:80])
-
-            if key not in seen:
-                merged.append(r)
-                seen.add(key)
-
-            if len(merged) >= k:
-                break
-
-        return merged
+        fused = self.reciprocal_rank_fusion([sem, kw])
+        return fused[:k]
 

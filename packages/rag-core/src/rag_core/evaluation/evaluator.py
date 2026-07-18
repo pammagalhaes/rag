@@ -1,6 +1,6 @@
-from typing import List, Dict, Any
 from dataclasses import dataclass
 import json
+from typing import List, Dict, Any, Optional
 
 try:
     from ragas import evaluate
@@ -21,14 +21,20 @@ class EvaluationResult:
     question: str
     answer: str
     contexts: List[str]
-    faithfulness: float = None
-    answer_relevancy: float = None
-    context_precision: float = None
-    context_recall: float = None
-    
+    ground_truth: Optional[str] = None
+    id: Optional[str] = None
+    topic: Optional[str] = None
+    faithfulness: Optional[float] = None
+    answer_relevancy: Optional[float] = None
+    context_precision: Optional[float] = None
+    context_recall: Optional[float] = None
+
     def to_dict(self) -> Dict[str, Any]:
         return {
+            "id": self.id,
+            "topic": self.topic,
             "question": self.question,
+            "ground_truth": self.ground_truth,
             "answer": self.answer,
             "contexts": self.contexts,
             "faithfulness": self.faithfulness,
@@ -39,7 +45,7 @@ class EvaluationResult:
 
 
 class RAGEvaluator:
-    def __init__(self, llm_client=None):
+    def __init__(self, llm_client: Any = None):
         if not HAS_RAGAS:
             raise ImportError(
                 "RAGAS is not installed. Install it with: pip install ragas"
@@ -51,27 +57,33 @@ class RAGEvaluator:
         question: str,
         answer: str,
         contexts: List[str],
+        ground_truth: str,
+        id: Optional[str] = None,
+        topic: Optional[str] = None,
     ) -> EvaluationResult:
         """
         Evaluate a single RAG response.
-        
+
         Args:
-            question: The input question
-            answer: The generated answer
-            contexts: List of retrieved context documents
-            
+            question: The input question.
+            answer: The generated answer.
+            contexts: List of retrieved context documents.
+            ground_truth: The reference answer from validation data.
+            id: Optional row identifier from the dataset.
+            topic: Optional topic label from the dataset.
+
         Returns:
-            EvaluationResult with metrics
+            EvaluationResult with metrics.
         """
         data = {
             "question": [question],
             "answer": [answer],
-            "contexts": [[contexts]],  # RAGAS expects nested lists
-            "ground_truth": [answer],  # Use answer as ground truth for demo
+            "contexts": [contexts],  # RAGAS expects a list of lists
+            "ground_truth": [ground_truth],
         }
-        
+
         dataset = Dataset.from_dict(data)
-        
+
         try:
             result = evaluate(
                 dataset,
@@ -82,23 +94,28 @@ class RAGEvaluator:
                     context_recall,
                 ],
             )
-            
-            eval_result = EvaluationResult(
+
+            return EvaluationResult(
+                id=id,
+                topic=topic,
                 question=question,
                 answer=answer,
+                ground_truth=ground_truth,
                 contexts=contexts,
                 faithfulness=result["faithfulness"][0],
                 answer_relevancy=result["answer_relevancy"][0],
                 context_precision=result["context_precision"][0],
                 context_recall=result["context_recall"][0],
             )
-            return eval_result
-            
+
         except Exception as e:
             print(f"Error evaluating response: {e}")
             return EvaluationResult(
+                id=id,
+                topic=topic,
                 question=question,
                 answer=answer,
+                ground_truth=ground_truth,
                 contexts=contexts,
             )
 
@@ -108,12 +125,13 @@ class RAGEvaluator:
     ) -> List[EvaluationResult]:
         """
         Evaluate multiple Q&A pairs.
-        
+
         Args:
-            qa_pairs: List of dicts with keys: question, answer, contexts
-            
+            qa_pairs: List of dicts with keys: question, answer, contexts, ground_truth,
+                and optionally id/topic.
+
         Returns:
-            List of EvaluationResult objects
+            List of EvaluationResult objects.
         """
         results = []
         for qa in qa_pairs:
@@ -121,6 +139,9 @@ class RAGEvaluator:
                 question=qa["question"],
                 answer=qa["answer"],
                 contexts=qa.get("contexts", []),
+                ground_truth=qa["ground_truth"],
+                id=qa.get("id"),
+                topic=qa.get("topic"),
             )
             results.append(result)
         return results

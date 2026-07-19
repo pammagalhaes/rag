@@ -26,3 +26,4 @@ data/processed/
 # python
 __pycache__/
 *.pyc
+data/evaluation_results.json

@@ -23,11 +23,26 @@ from rag_core.evaluation import RAGEvaluator
 
 
 def load_evaluation_dataset(csv_path: str) -> List[Dict[str, Any]]:
-    """Load evaluation examples from a CSV file.
+    """Load evaluation examples from the main Golden Dataset CSV.
 
     The CSV must contain the columns: id, topic, question, ground_truth.
+    Optional retrieval columns are: expected_sources, expected_pages,
+    expected_chunk_ids, expected_slide, and related review fields.
     """
-    df = pd.read_csv(csv_path, dtype={"id": str, "topic": str, "question": str, "ground_truth": str})
+    df = pd.read_csv(
+        csv_path,
+        dtype={
+            "id": str,
+            "topic": str,
+            "question": str,
+            "ground_truth": str,
+            "expected_sources": str,
+            "expected_pages": str,
+            "expected_chunk_ids": str,
+            "expected_slide": str,
+            "review_needed": str,
+        },
+    )
 
     required_columns = {"id", "topic", "question", "ground_truth"}
     missing_columns = required_columns.difference(df.columns)
@@ -83,6 +98,14 @@ def generate_rag_responses(
             "ground_truth": example.get("ground_truth"),
             "answer": answer,
             "contexts": contexts,
+            "retrieved_documents": documents,
+            "top_k": top_k,
+            "expected_sources": example.get("expected_sources"),
+            "expected_pages": example.get("expected_pages"),
+            "expected_chunk_ids": example.get("expected_chunk_ids"),
+            "expected_slide": example.get("expected_slide"),
+            "review_needed": example.get("review_needed"),
+            "notes": example.get("notes"),
         })
 
         print(f"Generated response for ID={example.get('id')} question={question}")

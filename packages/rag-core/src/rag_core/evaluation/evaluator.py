@@ -6,6 +6,8 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 import traceback
 
+from .matching import compute_retrieval_metrics
+
 try:
     from ragas import evaluate
     from ragas.metrics import (
@@ -112,105 +114,6 @@ class RAGEvaluator:
 
         return llm, embeddings
 
-    def _normalize_optional_int(self, value: Any) -> Optional[int]:
-        if value is None:
-            return None
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return None
-
-    def _expected_targets(self, qa: Dict[str, Any]) -> List[Dict[str, Any]]:
-        targets: List[Dict[str, Any]] = []
-
-        expected_chunk_ids = qa.get("expected_chunk_ids")
-        if expected_chunk_ids is None:
-            expected_chunk_ids = []
-        elif isinstance(expected_chunk_ids, str):
-            expected_chunk_ids = [value.strip() for value in expected_chunk_ids.split(",") if value.strip()]
-        elif not isinstance(expected_chunk_ids, list):
-            expected_chunk_ids = [expected_chunk_ids]
-
-        for chunk_id in expected_chunk_ids:
-            targets.append({"chunk_id": chunk_id})
-
-        expected_sources = qa.get("expected_sources")
-        if expected_sources is None:
-            expected_sources = []
-        elif isinstance(expected_sources, str):
-            expected_sources = [value.strip() for value in expected_sources.split(",") if value.strip()]
-        elif not isinstance(expected_sources, list):
-            expected_sources = [expected_sources]
-
-        for expected_source in expected_sources:
-            target = {"source": expected_source}
-            expected_pages = qa.get("expected_pages")
-            expected_page = None
-            if isinstance(expected_pages, str):
-                page_values = [value.strip() for value in expected_pages.split(";") if value.strip()]
-                if page_values:
-                    expected_page = self._normalize_optional_int(page_values[0])
-            elif expected_pages is not None:
-                expected_page = self._normalize_optional_int(expected_pages)
-
-            expected_slide = self._normalize_optional_int(qa.get("expected_slide"))
-            if expected_page is not None:
-                target["page"] = expected_page
-            if expected_slide is not None:
-                target["slide"] = expected_slide
-            targets.append(target)
-
-        return targets
-
-    def _candidate_matches_expected(self, document: Dict[str, Any], expected_targets: List[Dict[str, Any]]) -> bool:
-        if not expected_targets:
-            return False
-
-        for target in expected_targets:
-            if "chunk_id" in target:
-                doc_chunk_id = document.get("chunk_id") or document.get("id")
-                if doc_chunk_id is not None and str(doc_chunk_id) == str(target["chunk_id"]):
-                    return True
-
-            if "source" in target:
-                if str(document.get("source", "")).strip() != str(target["source"]).strip():
-                    continue
-                if "page" in target:
-                    doc_page = self._normalize_optional_int(document.get("page"))
-                    if doc_page != target["page"]:
-                        continue
-                if "slide" in target:
-                    doc_slide = self._normalize_optional_int(document.get("slide"))
-                    if doc_slide != target["slide"]:
-                        continue
-                return True
-
-        return False
-
-    def _compute_retrieval_metrics(self, qa: Dict[str, Any]) -> Tuple[Optional[float], Optional[float], Optional[int]]:
-        retrieved_documents = qa.get("retrieved_documents") or []
-        if not retrieved_documents:
-            return None, None, None
-
-        expected_targets = self._expected_targets(qa)
-        if not expected_targets:
-            return None, None, None
-
-        k = self._normalize_optional_int(qa.get("top_k"))
-        if k is None:
-            k = len(retrieved_documents)
-        if k <= 0:
-            k = 1
-        k = min(k, len(retrieved_documents))
-
-        relevant_hits = sum(
-            1 for doc in retrieved_documents[:k] if self._candidate_matches_expected(doc, expected_targets)
-        )
-
-        precision_at_k = relevant_hits / float(k)
-        recall_at_k = relevant_hits / float(len(expected_targets))
-        return precision_at_k, recall_at_k, k
-
     def evaluate_response(
         self,
         question: str,
@@ -272,7 +175,7 @@ class RAGEvaluator:
 
             results = []
             for index, qa in enumerate(qa_pairs):
-                precision_at_k, recall_at_k, retrieval_k = self._compute_retrieval_metrics(qa)
+                precision_at_k, recall_at_k, retrieval_k = compute_retrieval_metrics(qa)
                 results.append(
                     EvaluationResult(
                         id=qa.get("id"),

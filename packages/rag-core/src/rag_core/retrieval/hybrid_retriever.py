@@ -26,7 +26,24 @@ class HybridRetriever:
         q = qp.parse(query)
         with idx.searcher() as s:
             hits = s.search(q, limit=k)
-            return [{"source": h["source"], "text": h["content"]} for h in hits]
+            results = []
+            for h in hits:
+                doc = {
+                    "source": h["source"],
+                    "text": h["content"],
+                    "score": float(h.score) if h.score is not None else None,
+                }
+                # Forward page / slide metadata when the schema has those fields.
+                if "page" in idx.schema.names():
+                    raw_page = h.get("page", None)
+                    if raw_page is not None and raw_page != -1:
+                        doc["page"] = int(raw_page)
+                if "slide" in idx.schema.names():
+                    raw_slide = h.get("slide", None)
+                    if raw_slide is not None and raw_slide != -1:
+                        doc["slide"] = int(raw_slide)
+                results.append(doc)
+            return results
 
     def reciprocal_rank_fusion(self, rankings: List[List[Dict]], k: int = 60):
         scores = defaultdict(float)

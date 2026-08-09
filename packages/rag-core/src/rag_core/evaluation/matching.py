@@ -71,9 +71,17 @@ def expected_targets(qa: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 def candidate_matches_expected(
-    document: Dict[str, Any], expected_targets: List[Dict[str, Any]]
+    document: Dict[str, Any],
+    expected_targets: List[Dict[str, Any]],
+    page_tolerance: int = 0,
 ) -> bool:
-    """True iff `document` satisfies any of the expected targets."""
+    """True iff `document` satisfies any of the expected targets.
+
+    `page_tolerance` widens the page match: a doc page p is considered to match
+    expected page e when |p - e| <= page_tolerance. Used for "concept is
+    discussed nearby" style metrics. Tolerance does NOT affect chunk_id
+    matches (those are exact by design).
+    """
     if not expected_targets:
         return False
 
@@ -92,7 +100,11 @@ def candidate_matches_expected(
                 continue
             if "page" in target:
                 doc_page = normalize_optional_int(document.get("page"))
-                if doc_page != target["page"]:
+                expected_page = target["page"]
+                if doc_page is None or expected_page is None:
+                    if doc_page != expected_page:
+                        continue
+                elif abs(doc_page - expected_page) > page_tolerance:
                     continue
             if "slide" in target:
                 doc_slide = normalize_optional_int(document.get("slide"))
@@ -105,9 +117,11 @@ def candidate_matches_expected(
 
 def compute_retrieval_metrics(
     qa: Dict[str, Any],
+    page_tolerance: int = 0,
 ) -> Tuple[Optional[float], Optional[float], Optional[int]]:
     """Compute precision@k and recall@k for a single QA row.
 
+    `page_tolerance` widens the page match by ±N pages (default 0 = exact).
     Returns (precision_at_k, recall_at_k, k) or (None, None, None) when no
     retrieved documents / expected targets are available.
     """
@@ -128,7 +142,7 @@ def compute_retrieval_metrics(
 
     relevant_hits = sum(
         1 for doc in retrieved_documents[:k]
-        if candidate_matches_expected(doc, targets)
+        if candidate_matches_expected(doc, targets, page_tolerance=page_tolerance)
     )
 
     precision_at_k = relevant_hits / float(k)

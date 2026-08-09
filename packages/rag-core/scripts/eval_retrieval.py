@@ -142,6 +142,13 @@ def main() -> None:
         help="Number of chunks to retrieve per question",
     )
     parser.add_argument(
+        "--page-tolerance", type=int, default=1,
+        help="Widen page matching by ±N pages (default 1). A doc on page p "
+             "matches an expected page e when |p - e| <= page_tolerance. "
+             "Note: the library function compute_retrieval_metrics() keeps "
+             "the strict default (0); only this CLI defaults to ±1.",
+    )
+    parser.add_argument(
         "--output", default="data/retrieval_eval_results.json",
         help="Where to write the JSON results",
     )
@@ -172,7 +179,9 @@ def main() -> None:
 
     per_row: List[Dict[str, Any]] = []
     for qa in qa_pairs:
-        precision, recall, k = compute_retrieval_metrics(qa)
+        precision, recall, k = compute_retrieval_metrics(
+            qa, page_tolerance=args.page_tolerance,
+        )
         per_row.append({
             "id": qa.get("id"),
             "topic": qa.get("topic"),
@@ -180,6 +189,7 @@ def main() -> None:
             "retrieval_precision_at_k": precision,
             "retrieval_recall_at_k": recall,
             "retrieval_k": k,
+            "page_tolerance": args.page_tolerance,
             "expected_sources": qa.get("expected_sources"),
             "expected_pages": qa.get("expected_pages"),
             "expected_chunk_ids": qa.get("expected_chunk_ids"),
@@ -199,7 +209,8 @@ def main() -> None:
     print("\n" + "=" * 72)
     print("Retrieval-only evaluation")
     print("=" * 72)
-    print(f"Rows evaluated:  {summary['rows_evaluated']}")
+    print(f"Rows evaluated:    {summary['rows_evaluated']}")
+    print(f"Page tolerance:    ±{args.page_tolerance}")
     if summary["mean_precision_at_k"] is not None:
         print(f"Mean precision@k: {summary['mean_precision_at_k']:.4f}")
         print(f"Mean recall@k:    {summary['mean_recall_at_k']:.4f}")
@@ -209,6 +220,7 @@ def main() -> None:
         "summary": summary,
         "config": {
             "top_k": args.top_k,
+            "page_tolerance": args.page_tolerance,
             "evaluation_csv": args.evaluation_csv,
             "faiss_index": args.faiss_index,
             "faiss_meta": args.faiss_meta,

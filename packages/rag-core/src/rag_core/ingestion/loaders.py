@@ -12,7 +12,7 @@ from PIL import Image
 def load_pdf(path: str) -> List[Document]:
     reader = PdfReader(path)
     pages = []
-    for i, p in enumerate(reader.pages):
+    for i, p in enumerate(reader.pages, start=1):
         text = p.extract_text() or ""
         if text.strip():
             pages.append(Document(page_content=text, metadata={"source": os.path.basename(path), "page": i}))

@@ -26,7 +26,20 @@ class HybridRetriever:
         q = qp.parse(query)
         with idx.searcher() as s:
             hits = s.search(q, limit=k)
-            return [{"source": h["source"], "text": h["content"]} for h in hits]
+            results = []
+            for h in hits:
+                doc = {"source": h.get("source"), "text": h.get("content")}
+                # include stored page and chunk_id if available
+                try:
+                    doc["page"] = h.get("page")
+                except Exception:
+                    doc["page"] = None
+                try:
+                    doc["chunk_id"] = h.get("chunk_id")
+                except Exception:
+                    doc["chunk_id"] = None
+                results.append(doc)
+            return results
 
     def reciprocal_rank_fusion(self, rankings: List[List[Dict]], k: int = 60):
         scores = defaultdict(float)

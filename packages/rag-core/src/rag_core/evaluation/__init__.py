@@ -1,3 +1,3 @@
-from .evaluator import RAGEvaluator, EvaluationResult
+from .evaluator import RAGEvaluator, RetrievalEvaluator, EvaluationResult
 
-__all__ = ["RAGEvaluator", "EvaluationResult"]
+__all__ = ["RAGEvaluator", "RetrievalEvaluator", "EvaluationResult"]

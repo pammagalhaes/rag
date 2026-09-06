@@ -28,16 +28,20 @@ class HybridRetriever:
             hits = s.search(q, limit=k)
             results = []
             for h in hits:
-                doc = {"source": h.get("source"), "text": h.get("content")}
-                # include stored page and chunk_id if available
-                try:
-                    doc["page"] = h.get("page")
-                except Exception:
-                    doc["page"] = None
-                try:
-                    doc["chunk_id"] = h.get("chunk_id")
-                except Exception:
-                    doc["chunk_id"] = None
+                doc = {
+                    "source": h["source"],
+                    "text": h["content"],
+                    "score": float(h.score) if h.score is not None else None,
+                }
+                # Forward page / slide metadata when the schema has those fields.
+                if "page" in idx.schema.names():
+                    raw_page = h.get("page", None)
+                    if raw_page is not None and raw_page != -1:
+                        doc["page"] = int(raw_page)
+                if "slide" in idx.schema.names():
+                    raw_slide = h.get("slide", None)
+                    if raw_slide is not None and raw_slide != -1:
+                        doc["slide"] = int(raw_slide)
                 results.append(doc)
             return results
 

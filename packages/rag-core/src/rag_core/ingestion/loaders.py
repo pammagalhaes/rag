@@ -12,10 +12,16 @@ from PIL import Image
 def load_pdf(path: str) -> List[Document]:
     reader = PdfReader(path)
     pages = []
-    for i, p in enumerate(reader.pages, start=1):
+    # `page` is stored as a 1-indexed book page number so it lines up with the
+    # evaluation CSV's `expected_pages` column (which uses human-readable page
+    # numbers like "5" or "6;7;8").
+    for i, p in enumerate(reader.pages):
         text = p.extract_text() or ""
         if text.strip():
-            pages.append(Document(page_content=text, metadata={"source": os.path.basename(path), "page": i}))
+            pages.append(Document(
+                page_content=text,
+                metadata={"source": os.path.basename(path), "page": i + 1},
+            ))
     return pages
 
 

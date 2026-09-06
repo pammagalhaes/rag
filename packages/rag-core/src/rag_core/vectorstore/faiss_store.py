@@ -55,6 +55,7 @@ class FaissStore:
                     "text": meta.get("text", meta.get("page_content", "")),
                     "source": meta.get("source", ""),
                     "page": meta.get("page", None),
+                    "chunk_id": meta.get("chunk_id", None),
                     "score": float(score)
                 }
                 results.append(result)

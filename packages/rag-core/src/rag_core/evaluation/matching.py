@@ -18,13 +18,22 @@ def normalize_optional_int(value: Any) -> Optional[int]:
 
 
 def _split_csv(value: Any, sep: str = ",") -> List[str]:
-    """Split a delimited string into a list of trimmed non-empty tokens."""
+    """Split a delimited string into trimmed, non-empty tokens."""
     if value is None:
         return []
     if isinstance(value, list):
         return [str(v).strip() for v in value if str(v).strip()]
     if isinstance(value, str):
-        return [token.strip() for token in value.split(sep) if token.strip()]
+        separators = [sep]
+        if sep == ",":
+            separators.append(";")
+        tokens = [value]
+        for delimiter in separators:
+            next_tokens = []
+            for token in tokens:
+                next_tokens.extend(token.split(delimiter))
+            tokens = next_tokens
+        return [token.strip() for token in tokens if token.strip()]
     return [str(value).strip()]
 
 
@@ -37,15 +46,20 @@ def expected_targets(qa: Dict[str, Any]) -> List[Dict[str, Any]]:
                                — match by document filename + optional page/slide
 
     Sources of inputs (from the CSV):
-      - expected_chunk_ids (comma-separated)
-      - expected_sources (comma-separated)
-      - expected_pages (semicolon-separated list; only the first is used today)
+    - expected_chunk_ids (comma- or semicolon-separated)
+    - expected_sources (comma-separated)
+    - expected_pages (semicolon-separated list)
       - expected_slide (single int)
     """
     targets: List[Dict[str, Any]] = []
 
-    for chunk_id in _split_csv(qa.get("expected_chunk_ids")):
+    chunk_ids = _split_csv(qa.get("expected_chunk_ids"))
+    for chunk_id in chunk_ids:
         targets.append({"chunk_id": chunk_id})
+
+    # Chunk IDs are the authoritative retrieval ground truth when available.
+    if chunk_ids:
+        return targets
 
     expected_sources = _split_csv(qa.get("expected_sources"))
     if expected_sources:

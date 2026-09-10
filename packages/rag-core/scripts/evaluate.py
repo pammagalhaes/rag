@@ -19,7 +19,11 @@ from rag_core.llm.transformers_client import TransformersClient
 from rag_core.vectorstore.faiss_store import FaissStore
 from rag_core.retrieval.hybrid_retriever import HybridRetriever
 from rag_core.prompt_engineering.templates import load_templates
-from rag_core.evaluation import RetrievalEvaluator
+from rag_core.evaluation.matching import (
+    candidate_matches_expected,
+    compute_retrieval_metrics,
+    expected_targets,
+)
 
 
 def load_evaluation_dataset(csv_path: str) -> List[Dict[str, Any]]:
@@ -140,7 +144,48 @@ def run_retrieval_only(
         whoosh_index_dir=whoosh_index_dir,
     )
 
-    aggregate, per_question = RetrievalEvaluator.evaluate_dataset(evaluation_data, retriever, ks)
+    max_k = max(ks)
+    aggregate = {k: {"precision": [], "recall": []} for k in ks}
+    per_question = []
+
+    for example in evaluation_data:
+        documents = retriever.hybrid(example["question"], k=max_k)
+        metrics = {}
+        for k in ks:
+            qa = dict(example)
+            qa["retrieved_documents"] = documents[:k]
+            qa["top_k"] = k
+            precision, recall, _ = compute_retrieval_metrics(qa)
+            metrics[k] = {
+                "precision": precision,
+                "recall": recall,
+                "relevant_hits": sum(
+                    1 for document in documents[:k]
+                    if candidate_matches_expected(
+                        document,
+                        expected_targets(example),
+                    )
+                ),
+            }
+            if precision is not None:
+                aggregate[k]["precision"].append(precision)
+            if recall is not None:
+                aggregate[k]["recall"].append(recall)
+
+        per_question.append({
+            "id": example.get("id"),
+            "question": example.get("question"),
+            "expected_chunk_ids": example.get("expected_chunk_ids"),
+            "metrics": metrics,
+        })
+
+    aggregate = {
+        k: {
+            "precision": sum(values["precision"]) / len(values["precision"]) if values["precision"] else 0.0,
+            "recall": sum(values["recall"]) / len(values["recall"]) if values["recall"] else 0.0,
+        }
+        for k, values in aggregate.items()
+    }
 
     print("\n" + "=" * 80)
     print("Retrieval Evaluation")

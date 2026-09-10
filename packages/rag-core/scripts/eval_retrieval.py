@@ -156,8 +156,11 @@ def main() -> None:
 
     examples = load_evaluation_dataset(args.evaluation_csv)
 
-    # Drop rows without expected_sources — we can't score them.
-    scorable = [ex for ex in examples if ex.get("expected_sources")]
+    # Keep rows with either chunk IDs or legacy source/page targets.
+    scorable = [
+        ex for ex in examples
+        if ex.get("expected_chunk_ids") or ex.get("expected_sources")
+    ]
     skipped = len(examples) - len(scorable)
     if skipped:
         print(

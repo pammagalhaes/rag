@@ -1,11 +1,15 @@
-from rag_core.evaluation.evaluator import RetrievalEvaluator
+from rag_core.evaluation.matching import compute_retrieval_metrics
 
 
 def test_single_expected_chunk():
     qa = {"expected_chunk_ids": "chunk-a"}
     retrieved = [{"chunk_id": "chunk-a"}, {"chunk_id": "chunk-b"}]
     ks = [1, 2]
-    metrics = RetrievalEvaluator.compute_metrics_for_example(qa, retrieved, ks)
+    metrics = {}
+    for k in ks:
+        row = {**qa, "retrieved_documents": retrieved[:k], "top_k": k}
+        precision, recall, _ = compute_retrieval_metrics(row)
+        metrics[k] = {"precision": precision, "recall": recall}
 
     assert metrics[1]["precision"] == 1.0
     assert metrics[1]["recall"] == 1.0
@@ -18,7 +22,11 @@ def test_multiple_expected_chunks():
     qa = {"expected_chunk_ids": "a,b"}
     retrieved = [{"chunk_id": "b"}, {"chunk_id": "c"}, {"chunk_id": "a"}]
     ks = [2, 3]
-    metrics = RetrievalEvaluator.compute_metrics_for_example(qa, retrieved, ks)
+    metrics = {}
+    for k in ks:
+        row = {**qa, "retrieved_documents": retrieved[:k], "top_k": k}
+        precision, recall, _ = compute_retrieval_metrics(row)
+        metrics[k] = {"precision": precision, "recall": recall}
 
     # K=2: only 'b' found
     assert metrics[2]["relevant_hits"] == 1
@@ -38,7 +46,11 @@ def test_no_expected_chunk_fallback_to_pages():
         {"source": "book.pdf", "page": 6},
     ]
     ks = [1, 2]
-    metrics = RetrievalEvaluator.compute_metrics_for_example(qa, retrieved, ks)
+    metrics = {}
+    for k in ks:
+        row = {**qa, "retrieved_documents": retrieved[:k], "top_k": k}
+        precision, recall, _ = compute_retrieval_metrics(row)
+        metrics[k] = {"precision": precision, "recall": recall}
 
     assert metrics[1]["relevant_hits"] == 1
     assert abs(metrics[1]["precision"] - 1.0) < 1e-6
@@ -53,7 +65,11 @@ def test_k_larger_than_retrieved():
     qa = {"expected_chunk_ids": "x"}
     retrieved = [{"chunk_id": "x"}]
     ks = [5]
-    metrics = RetrievalEvaluator.compute_metrics_for_example(qa, retrieved, ks)
+    metrics = {}
+    for k in ks:
+        row = {**qa, "retrieved_documents": retrieved[:k], "top_k": k}
+        precision, recall, _ = compute_retrieval_metrics(row)
+        metrics[k] = {"precision": precision, "recall": recall}
 
     # only 1 doc retrieved, so precision uses k_used=1 denominator
     assert metrics[5]["relevant_hits"] == 1

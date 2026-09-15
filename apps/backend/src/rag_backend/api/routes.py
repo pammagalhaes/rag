@@ -16,15 +16,14 @@ async def ask(q: Query):
     if not q.question:
         raise HTTPException(status_code=400, detail="Missing question")
 
-    answer = rag.answer(q.question)
-    return {"answer": answer}
+    return rag.answer_with_sources(q.question)
 
 @router.post("/chat")
 async def chat(req: ChatRequest):
     if not req.question:
         raise HTTPException(status_code=400, detail="Missing question")
 
-  
+
     history_text = ""
     for msg in req.history:
         role = "User" if msg["role"] == "user" else "Assistant"
@@ -36,8 +35,7 @@ async def chat(req: ChatRequest):
         f"User question: {req.question}"
     )
 
-    answer = rag.answer(prompt)
-    return {"answer": answer}
+    return rag.answer_with_sources(prompt)
 
 @router.post("/upload")
 async def upload_file(file: UploadFile = File(...)):

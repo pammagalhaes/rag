@@ -31,6 +31,8 @@ class HybridRetriever:
                 doc = {
                     "source": h["source"],
                     "text": h["content"],
+                    "chunk_id": h.get("chunk_id"),
+                    "backend": "whoosh",
                     "score": float(h.score) if h.score is not None else None,
                 }
                 # Forward page / slide metadata when the schema has those fields.
@@ -51,7 +53,11 @@ class HybridRetriever:
 
         for ranking in rankings:
             for rank, doc in enumerate(ranking):
-                doc_id = (doc.get("source"), doc.get("text")[:100])
+                chunk_id = doc.get("chunk_id")
+                if chunk_id:
+                    doc_id = ("chunk", str(chunk_id))
+                else:
+                    doc_id = ("legacy", doc.get("source"), doc.get("text", "")[:100])
                 documents[doc_id] = doc
                 scores[doc_id] += 1 / (k + rank + 1)
 

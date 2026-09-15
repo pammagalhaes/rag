@@ -201,6 +201,8 @@ def main() -> None:
                 {
                     "source": d.get("source"),
                     "page": d.get("page"),
+                    "chunk_id": d.get("chunk_id"),
+                    "backend": d.get("backend"),
                     "score": d.get("score"),
                 }
                 for d in (qa.get("retrieved_documents") or [])

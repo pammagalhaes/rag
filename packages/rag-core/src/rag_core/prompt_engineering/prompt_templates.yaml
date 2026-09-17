@@ -16,7 +16,8 @@ qa_prompt: |
 rerank_prompt: |
   You are a relevance-ranking assistant.
   Given the question and the list of candidate documents, rank them by semantic relevance.
-  Return ONLY the top N most relevant candidates, ordered from most relevant to least relevant.
+  Return ONLY valid JSON with this exact shape: {{"ranking":[0,2,1]}}
+  The numbers are zero-based candidate indexes, ordered from most relevant to least relevant.
 
   QUESTION:
   {question}
@@ -24,4 +25,13 @@ rerank_prompt: |
   CANDIDATES:
   {candidates}
 
-  OUTPUT (top N ranked candidates):
+  OUTPUT (JSON ranking):
+
+agent_decision_prompt: |
+  Choose how to search the knowledge base before answering the question.
+  Return ONLY valid JSON with this exact shape:
+  {{"search_type":"semantic|keyword|hybrid","query":"...","top_k":5,"use_rerank":false}}
+  Use hybrid for most conceptual questions. Use keyword for exact terms.
+
+  QUESTION:
+  {question}

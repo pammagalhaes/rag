@@ -20,6 +20,10 @@ retrieval:
   bm25_k: 5
   hybrid_top_k: 5
 
+agent:
+  enabled: false
+  max_candidates: 10
+
 
 api:
   rate_limit_per_minute: 60

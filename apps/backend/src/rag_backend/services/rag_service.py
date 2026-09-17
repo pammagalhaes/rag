@@ -28,12 +28,26 @@ class RAGService:
             retriever=self.retriever,
             prompt_templates=self.templates
         )
+        self.langgraph_agent = None
+        agent_cfg = cfg.get("agent", {})
+        if agent_cfg.get("enabled", False):
+            from rag_core.agents.langgraph_agent import LangGraphAgent
+
+            self.langgraph_agent = LangGraphAgent(
+                model_client=self.model,
+                retriever=self.retriever,
+                prompt_templates=self.templates,
+                max_candidates=agent_cfg.get("max_candidates", 10),
+            )
 
     def answer(self, question: str) -> str:
         result = self.answer_with_sources(question)
         return result["answer"]
 
     def answer_with_sources(self, question: str):
+        if self.langgraph_agent is not None:
+            return self.langgraph_agent.run(question)
+
         docs = self.retriever.hybrid(question, k=5)
 
         if not docs:

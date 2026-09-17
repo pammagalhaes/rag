@@ -6,33 +6,44 @@ import os
 
 
 class TransformersClient(ModelClient):
-    def __init__(self):
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise RuntimeError("OPENAI_API_KEY is not set")
+    """OpenAI client used for embeddings and text generation."""
 
-        self.client = OpenAI(api_key=api_key)  
+    DEFAULT_OPENAI_EMBED_MODEL = "text-embedding-3-small"
+    DEFAULT_OPENAI_CHAT_MODEL = "gpt-4o-mini"
+
+    def __init__(self):
+        openai_key = os.getenv("OPENAI_API_KEY")
+
+        if not openai_key:
+            raise RuntimeError(
+                "OPENAI_API_KEY is not set. "
+                "Configure it before instantiating TransformersClient."
+            )
+
+        self.backend = "openai"
+        self.client = OpenAI(api_key=openai_key)
+        self.embed_model = os.getenv(
+            "OPENAI_EMBED_MODEL", self.DEFAULT_OPENAI_EMBED_MODEL
+        )
+        self.chat_model = os.getenv(
+            "OPENAI_CHAT_MODEL", self.DEFAULT_OPENAI_CHAT_MODEL
+        )
 
     def embed(self, texts: List[str]):
-        """
-        Uses OpenAI embedding model: text-embedding-3-small
-        """
+        """Embed a batch of texts using the configured backend."""
         response = self.client.embeddings.create(
             input=texts,
-            model="text-embedding-3-small"
+            model=self.embed_model,
         )
         vectors = [item.embedding for item in response.data]
         return np.array(vectors)
 
     def generate(self, prompt: str, max_tokens: int = 256) -> str:
-        """
-        Uses OpenAI generation model (recommended API).
-        """
+        """Generate text using the OpenAI Responses API."""
         response = self.client.responses.create(
-            model="gpt-4o-mini",
+            model=self.chat_model,
             input=prompt,
             max_output_tokens=max_tokens,
             temperature=0,
         )
         return response.output_text
-

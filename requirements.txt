@@ -13,3 +13,14 @@ diskcache
 slowapi
 langchain
 langchain-text-splitter
+# Evaluation pipeline (PR #9: feature/ragas-evaluation)
+openai>=1.0
+python-dotenv>=1.0
+pandas>=2.0
+# Required by RAGAS-backed evaluator (RAGEvaluator in
+# packages/rag-core/src/rag_core/evaluation/evaluator.py). Retrieval-only
+# evaluation works without these.
+ragas>=0.4,<0.5
+langchain-openai>=0.1
+datasets>=2.0
+numpy>=1.24

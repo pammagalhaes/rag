@@ -22,7 +22,11 @@ venv/
 data/cache/
 data/index/
 data/processed/
+data/evaluation_results.json
+data/retrieval_eval_results.json
+data/retrieval_*_eval*.json
 
 # python
 __pycache__/
 *.pyc
+data/evaluation_results.json

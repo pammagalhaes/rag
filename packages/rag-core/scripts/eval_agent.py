@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import math
 import os
 import sys
 import time
@@ -39,11 +40,17 @@ def main() -> None:
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--output", default="data/agent_eval_results.json")
     parser.add_argument("--skip-ragas", action="store_true")
+    parser.add_argument(
+        "--free-agent",
+        action="store_true",
+        help="Evaluate agent-selected retrieval without the baseline hybrid anchor",
+    )
     args = parser.parse_args()
 
     cfg = load_config("default.yaml")
     cfg.setdefault("agent", {})["enabled"] = True
     cfg["agent"]["max_candidates"] = max(args.top_k, cfg["agent"].get("max_candidates", 10))
+    cfg["agent"]["protect_baseline"] = not args.free_agent
     service = RAGService(cfg)
     examples = load_dataset(args.evaluation_csv)
 
@@ -94,7 +101,12 @@ def main() -> None:
             "mean_precision_at_k": sum(valid_precision) / len(valid_precision) if valid_precision else None,
             "mean_recall_at_k": sum(valid_recall) / len(valid_recall) if valid_recall else None,
         },
-        "config": {"top_k": args.top_k, "evaluation_csv": args.evaluation_csv, "agent": True},
+        "config": {
+            "top_k": args.top_k,
+            "evaluation_csv": args.evaluation_csv,
+            "agent": True,
+            "protect_baseline": not args.free_agent,
+        },
         "rows": rows,
     }
 
@@ -113,6 +125,10 @@ def main() -> None:
             f"mean_{metric}": _mean_metric(ragas_results, metric)
             for metric in metric_names
         }
+        payload["ragas_summary"]["valid_rows"] = {
+            metric: _valid_metric_count(ragas_results, metric)
+            for metric in metric_names
+        }
 
     output_dir = os.path.dirname(args.output)
     if output_dir:
@@ -124,11 +140,21 @@ def main() -> None:
 
 def _mean_metric(results: List[Any], metric_name: str):
     values = [
-        getattr(result, metric_name)
+        float(getattr(result, metric_name))
         for result in results
         if getattr(result, metric_name) is not None
+        and math.isfinite(float(getattr(result, metric_name)))
     ]
     return sum(values) / len(values) if values else None
+
+
+def _valid_metric_count(results: List[Any], metric_name: str) -> int:
+    return sum(
+        1
+        for result in results
+        if getattr(result, metric_name) is not None
+        and math.isfinite(float(getattr(result, metric_name)))
+    )
 
 
 if __name__ == "__main__":

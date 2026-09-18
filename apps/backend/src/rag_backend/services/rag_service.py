@@ -38,6 +38,7 @@ class RAGService:
                 retriever=self.retriever,
                 prompt_templates=self.templates,
                 max_candidates=agent_cfg.get("max_candidates", 10),
+                protect_baseline=agent_cfg.get("protect_baseline", True),
             )
 
     def answer(self, question: str) -> str:

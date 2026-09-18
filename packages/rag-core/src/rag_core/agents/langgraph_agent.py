@@ -12,6 +12,7 @@ class AgentState(TypedDict, total=False):
     search_query: str
     search_type: SearchType
     top_k: int
+    candidate_k: int
     forced_top_k: int
     use_rerank: bool
     documents: List[Dict[str, Any]]
@@ -21,13 +22,21 @@ class AgentState(TypedDict, total=False):
 class LangGraphAgent:
     """Optional graph agent that orchestrates the existing RAG components."""
 
-    def __init__(self, model_client, retriever, prompt_templates, max_candidates: int = 10):
+    def __init__(
+        self,
+        model_client,
+        retriever,
+        prompt_templates,
+        max_candidates: int = 10,
+        protect_baseline: bool = True,
+    ):
         self.model = model_client
         self.retriever = retriever
         self.decision_prompt = prompt_templates["agent_decision_prompt"]
         self.qa_prompt = prompt_templates["qa_prompt"]
         self.rerank_prompt = prompt_templates["rerank_prompt"]
         self.max_candidates = max_candidates
+        self.protect_baseline = protect_baseline
 
         graph = StateGraph(AgentState)
         graph.add_node("decide_search", self.decide_search)
@@ -57,25 +66,59 @@ class LangGraphAgent:
             top_k = max(1, min(int(top_k), self.max_candidates))
         except (TypeError, ValueError):
             top_k = 5
+        candidate_k = max(top_k, self.max_candidates)
+        rerank_value = decision.get("use_rerank", False)
+        if isinstance(rerank_value, str):
+            rerank_value = rerank_value.strip().lower() in {"true", "1", "yes"}
         return {
             **state,
             "search_query": str(decision.get("query") or state["question"]),
             "search_type": search_type,
             "top_k": top_k,
-            "use_rerank": bool(decision.get("use_rerank", False)),
+            "candidate_k": candidate_k,
+            "use_rerank": bool(rerank_value),
         }
 
     def search(self, state: AgentState) -> AgentState:
         query = state["search_query"]
-        top_k = state["top_k"]
+        top_k = state["candidate_k"]
         search_type = state["search_type"]
+        baseline_documents = (
+            self.retriever.hybrid(state["question"], k=top_k)
+            if self.protect_baseline
+            else []
+        )
         if search_type == "semantic":
             documents = self.retriever.semantic_search(query, k=top_k)
         elif search_type == "keyword":
             documents = self.retriever.keyword_search(query, k=top_k)
         else:
             documents = self.retriever.hybrid(query, k=top_k)
-        return {**state, "documents": documents}
+
+        if not documents:
+            fallback_query = state["question"]
+            fallback_searches = [
+                ("hybrid_fallback", lambda: self.retriever.hybrid(fallback_query, k=top_k)),
+                ("semantic_fallback", lambda: self.retriever.semantic_search(fallback_query, k=top_k)),
+                ("keyword_fallback", lambda: self.retriever.keyword_search(fallback_query, k=top_k)),
+            ]
+            for fallback_type, fallback_documents in fallback_searches:
+                documents = fallback_documents()
+                if documents:
+                    search_type = fallback_type
+                    break
+
+        merged_documents = []
+        seen = set()
+        for document in [*baseline_documents, *documents]:
+            document_key = document.get("chunk_id") or (
+                document.get("source"), document.get("text", "")[:100]
+            )
+            if document_key not in seen:
+                merged_documents.append(document)
+                seen.add(document_key)
+
+        return {**state, "documents": merged_documents[:top_k], "search_type": search_type}
 
     def route_after_search(self, state: AgentState) -> str:
         return "rerank" if state.get("use_rerank") and state.get("documents") else "answer"
@@ -106,13 +149,18 @@ class LangGraphAgent:
         return {**state, "documents": ordered[: state["top_k"]]}
 
     def answer_node(self, state: AgentState) -> AgentState:
+        documents = state.get("documents", [])[: state["top_k"]]
         context = "\n\n".join(
             f"Source: {document.get('source', 'unknown')}\nText: {document.get('text', '')}"
-            for document in state.get("documents", [])
+            for document in documents
         )
         prompt = self.qa_prompt.format(context=context, question=state["question"])
         answer = self.model.generate(prompt).strip()
-        return {**state, "answer": answer or "I could not find the answer in the provided context."}
+        return {
+            **state,
+            "documents": documents,
+            "answer": answer or "I could not find the answer in the provided context.",
+        }
 
     def run(self, question: str, top_k: int | None = None) -> Dict[str, Any]:
         initial_state: AgentState = {"question": question}

@@ -1,4 +1,5 @@
 import os
+import math
 from dataclasses import dataclass
 import json
 from typing import List, Dict, Any, Optional, Tuple
@@ -184,10 +185,10 @@ class RAGEvaluator:
                         answer=qa["answer"],
                         ground_truth=qa["ground_truth"],
                         contexts=qa.get("contexts", []),
-                        faithfulness=result["faithfulness"][index],
-                        answer_relevancy=result["answer_relevancy"][index],
-                        context_precision=result["context_precision"][index],
-                        context_recall=result["context_recall"][index],
+                        faithfulness=_finite_or_none(result["faithfulness"][index]),
+                        answer_relevancy=_finite_or_none(result["answer_relevancy"][index]),
+                        context_precision=_finite_or_none(result["context_precision"][index]),
+                        context_recall=_finite_or_none(result["context_recall"][index]),
                         retrieved_documents=qa.get("retrieved_documents", []),
                         retrieval_precision_at_k=precision_at_k,
                         retrieval_recall_at_k=recall_at_k,
@@ -210,6 +211,17 @@ class RAGEvaluator:
                 )
                 for qa in qa_pairs
             ]
+
+
+def _finite_or_none(value: Any) -> Optional[float]:
+    """Convert RAGAS NaN/inf outputs into explicit missing values."""
+    if value is None:
+        return None
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return None
+    return value if math.isfinite(value) else None
 
     def print_results(self, results: List[EvaluationResult]) -> None:
         """Print evaluation results in a human-readable format."""

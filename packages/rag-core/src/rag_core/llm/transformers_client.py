@@ -21,7 +21,8 @@ class TransformersClient(ModelClient):
     DEFAULT_OPENROUTER_EMBED_MODEL = "openai/text-embedding-3-small"
     DEFAULT_OPENROUTER_CHAT_MODEL = "openai/gpt-4o-mini"
 
-    def __init__(self):
+    def __init__(self, temperature: float = 0.0):
+        self.temperature = float(temperature)
         openrouter_key = os.getenv("OPENROUTER_API_KEY")
         openai_key = os.getenv("OPENAI_API_KEY")
 
@@ -73,7 +74,7 @@ class TransformersClient(ModelClient):
                 model=self.chat_model,
                 input=prompt,
                 max_output_tokens=max_tokens,
-                temperature=0,
+                temperature=self.temperature,
             )
             return response.output_text
 
@@ -82,6 +83,6 @@ class TransformersClient(ModelClient):
             model=self.chat_model,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=max_tokens,
-            temperature=0,
+            temperature=self.temperature,
         )
         return response.choices[0].message.content or ""

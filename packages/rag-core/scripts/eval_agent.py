@@ -41,6 +41,11 @@ def main() -> None:
     parser.add_argument("--output", default="data/agent_eval_results.json")
     parser.add_argument("--skip-ragas", action="store_true")
     parser.add_argument(
+        "--disable-rerank",
+        action="store_true",
+        help="Disable the agent reranking step for retrieval ablation",
+    )
+    parser.add_argument(
         "--free-agent",
         action="store_true",
         help="Evaluate agent-selected retrieval without the baseline hybrid anchor",
@@ -51,6 +56,7 @@ def main() -> None:
     cfg.setdefault("agent", {})["enabled"] = True
     cfg["agent"]["max_candidates"] = max(args.top_k, cfg["agent"].get("max_candidates", 10))
     cfg["agent"]["protect_baseline"] = not args.free_agent
+    cfg["agent"]["rerank_enabled"] = not args.disable_rerank
     service = RAGService(cfg)
     examples = load_dataset(args.evaluation_csv)
 
@@ -78,6 +84,11 @@ def main() -> None:
             "search_query": result.get("search_query"),
             "search_type": result.get("search_type"),
             "use_rerank": result.get("use_rerank", False),
+            "candidate_count_after_search": result.get("candidate_count_after_search", 0),
+            "candidate_count_after_rerank": result.get(
+                "candidate_count_after_rerank", 0
+            ),
+            "final_count": result.get("final_count", 0),
             "expected_chunk_ids": example.get("expected_chunk_ids"),
             "retrieved_documents": result.get("retrieved_documents", []),
         })
@@ -106,6 +117,7 @@ def main() -> None:
             "evaluation_csv": args.evaluation_csv,
             "agent": True,
             "protect_baseline": not args.free_agent,
+            "rerank_enabled": not args.disable_rerank,
         },
         "rows": rows,
     }

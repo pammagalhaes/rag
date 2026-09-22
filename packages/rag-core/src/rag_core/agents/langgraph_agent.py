@@ -16,6 +16,9 @@ class AgentState(TypedDict, total=False):
     forced_top_k: int
     use_rerank: bool
     documents: List[Dict[str, Any]]
+    candidate_count_after_search: int
+    candidate_count_after_rerank: int
+    final_count: int
     answer: str
 
 
@@ -29,6 +32,7 @@ class LangGraphAgent:
         prompt_templates,
         max_candidates: int = 10,
         protect_baseline: bool = True,
+        rerank_enabled: bool = True,
     ):
         self.model = model_client
         self.retriever = retriever
@@ -37,6 +41,7 @@ class LangGraphAgent:
         self.rerank_prompt = prompt_templates["rerank_prompt"]
         self.max_candidates = max_candidates
         self.protect_baseline = protect_baseline
+        self.rerank_enabled = rerank_enabled
 
         graph = StateGraph(AgentState)
         graph.add_node("decide_search", self.decide_search)
@@ -76,7 +81,7 @@ class LangGraphAgent:
             "search_type": search_type,
             "top_k": top_k,
             "candidate_k": candidate_k,
-            "use_rerank": bool(rerank_value),
+            "use_rerank": bool(rerank_value) and self.rerank_enabled,
         }
 
     def search(self, state: AgentState) -> AgentState:
@@ -118,7 +123,13 @@ class LangGraphAgent:
                 merged_documents.append(document)
                 seen.add(document_key)
 
-        return {**state, "documents": merged_documents[:top_k], "search_type": search_type}
+        candidate_documents = merged_documents[: state["candidate_k"]]
+        return {
+            **state,
+            "documents": candidate_documents,
+            "candidate_count_after_search": len(candidate_documents),
+            "search_type": search_type,
+        }
 
     def route_after_search(self, state: AgentState) -> str:
         return "rerank" if state.get("use_rerank") and state.get("documents") else "answer"
@@ -146,7 +157,12 @@ class LangGraphAgent:
                 ordered.append(documents[index])
                 seen.add(index)
         ordered.extend(document for index, document in enumerate(documents) if index not in seen)
-        return {**state, "documents": ordered[: state["top_k"]]}
+        reranked_documents = ordered[: state["top_k"]]
+        return {
+            **state,
+            "documents": reranked_documents,
+            "candidate_count_after_rerank": len(reranked_documents),
+        }
 
     def answer_node(self, state: AgentState) -> AgentState:
         documents = state.get("documents", [])[: state["top_k"]]
@@ -159,6 +175,7 @@ class LangGraphAgent:
         return {
             **state,
             "documents": documents,
+            "final_count": len(documents),
             "answer": answer or "I could not find the answer in the provided context.",
         }
 
@@ -174,6 +191,11 @@ class LangGraphAgent:
             "search_type": state.get("search_type"),
             "top_k": state.get("top_k"),
             "use_rerank": state.get("use_rerank", False),
+            "candidate_count_after_search": state.get("candidate_count_after_search", 0),
+            "candidate_count_after_rerank": state.get(
+                "candidate_count_after_rerank", 0
+            ),
+            "final_count": state.get("final_count", 0),
             "sources": [
                 {
                     "source": document.get("source"),
@@ -186,6 +208,7 @@ class LangGraphAgent:
                 for document in state.get("documents", [])
             ],
         }
+
 
     @staticmethod
     def _parse_json(raw: str) -> Dict[str, Any]:

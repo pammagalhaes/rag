@@ -7,7 +7,9 @@ from rag_core.prompt_engineering.templates import load_templates
 class RAGService:
     def __init__(self, cfg):
         self.cfg = cfg
-        self.model = TransformersClient()
+        self.model = TransformersClient(
+            temperature=cfg.get("model", {}).get("temperature", 0.0)
+        )
 
         self.faiss = FaissStore(
             dim=1536,
@@ -39,6 +41,7 @@ class RAGService:
                 prompt_templates=self.templates,
                 max_candidates=agent_cfg.get("max_candidates", 10),
                 protect_baseline=agent_cfg.get("protect_baseline", True),
+                rerank_enabled=agent_cfg.get("rerank_enabled", True),
             )
 
     def answer(self, question: str) -> str:

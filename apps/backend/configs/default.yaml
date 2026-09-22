@@ -5,9 +5,7 @@ app:
 
 
 model:
-  embed_model: "sentence-transformers/all-MiniLM-L6-v2"
-  gen_model: "google/flan-t5-base"
-  embedding_batch_size: 32
+  temperature: 0.0
 
 
 vectorstore:

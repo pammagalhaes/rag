@@ -41,6 +41,21 @@ def main() -> None:
     parser.add_argument("--output", default="data/agent_eval_results.json")
     parser.add_argument("--skip-ragas", action="store_true")
     parser.add_argument(
+        "--limit",
+        type=int,
+        help="Evaluate only the first N questions (useful for a tracing smoke test)",
+    )
+    parser.add_argument(
+        "--langfuse",
+        action="store_true",
+        help="Enable Langfuse tracing for this evaluation run",
+    )
+    parser.add_argument(
+        "--capture-content",
+        action="store_true",
+        help="Send questions, prompts, retrieved text, and answers to Langfuse",
+    )
+    parser.add_argument(
         "--disable-rerank",
         action="store_true",
         help="Disable the agent reranking step for retrieval ablation",
@@ -51,20 +66,40 @@ def main() -> None:
         help="Evaluate agent-selected retrieval without the baseline hybrid anchor",
     )
     args = parser.parse_args()
+    if args.limit is not None and args.limit < 1:
+        parser.error("--limit must be greater than zero")
 
     cfg = load_config("default.yaml")
     cfg.setdefault("agent", {})["enabled"] = True
+    observability_cfg = cfg.setdefault("observability", {})
+    observability_cfg["langfuse_enabled"] = (
+        args.langfuse or observability_cfg.get("langfuse_enabled", False)
+    )
+    if args.capture_content:
+        observability_cfg["langfuse_enabled"] = True
+        observability_cfg["capture_content"] = True
     cfg["agent"]["max_candidates"] = max(args.top_k, cfg["agent"].get("max_candidates", 10))
     cfg["agent"]["protect_baseline"] = not args.free_agent
     cfg["agent"]["rerank_enabled"] = not args.disable_rerank
     service = RAGService(cfg)
     examples = load_dataset(args.evaluation_csv)
+    if args.limit is not None:
+        examples = examples[: args.limit]
 
     rows = []
     ragas_pairs = []
+    trace_ids = {}
     for example in examples:
         started = time.perf_counter()
-        result = service.langgraph_agent.run(example["question"], top_k=args.top_k)
+        result = service.langgraph_agent.run(
+            example["question"],
+            top_k=args.top_k,
+            trace_metadata={
+                "question_id": str(example.get("id", "")),
+                "topic": str(example.get("topic", "")),
+                "evaluation_run": True,
+            },
+        )
         latency_ms = (time.perf_counter() - started) * 1000
         qa = {
             **example,
@@ -72,9 +107,14 @@ def main() -> None:
             "top_k": args.top_k,
         }
         precision, recall, k = compute_retrieval_metrics(qa)
+        trace_id = result.get("langfuse_trace_id")
+        trace_ids[str(example.get("id", ""))] = trace_id
+        service.tracer.score(trace_id, "retrieval_precision_at_k", precision)
+        service.tracer.score(trace_id, "retrieval_recall_at_k", recall)
         rows.append({
             "id": example.get("id"),
             "topic": example.get("topic"),
+            "langfuse_trace_id": trace_id,
             "question": example["question"],
             "answer": result.get("answer"),
             "retrieval_precision_at_k": precision,
@@ -118,6 +158,8 @@ def main() -> None:
             "agent": True,
             "protect_baseline": not args.free_agent,
             "rerank_enabled": not args.disable_rerank,
+            "langfuse_enabled": service.tracer.enabled,
+            "capture_content": service.tracer.capture_content,
         },
         "rows": rows,
     }
@@ -133,6 +175,14 @@ def main() -> None:
             "context_precision",
             "context_recall",
         ]
+        for ragas_result in ragas_results:
+            trace_id = trace_ids.get(str(ragas_result.id or ""))
+            for metric_name in metric_names:
+                service.tracer.score(
+                    trace_id,
+                    metric_name,
+                    getattr(ragas_result, metric_name, None),
+                )
         payload["ragas_summary"] = {
             f"mean_{metric}": _mean_metric(ragas_results, metric)
             for metric in metric_names
@@ -142,6 +192,7 @@ def main() -> None:
             for metric in metric_names
         }
 
+    service.tracer.flush()
     output_dir = os.path.dirname(args.output)
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)

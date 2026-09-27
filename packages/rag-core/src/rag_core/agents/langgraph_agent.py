@@ -1,5 +1,6 @@
 import json
 from typing import Any, Dict, List, Literal, TypedDict
+from contextlib import nullcontext
 
 from langgraph.graph import END, START, StateGraph
 
@@ -33,6 +34,7 @@ class LangGraphAgent:
         max_candidates: int = 10,
         protect_baseline: bool = True,
         rerank_enabled: bool = True,
+        tracer=None,
     ):
         self.model = model_client
         self.retriever = retriever
@@ -42,12 +44,13 @@ class LangGraphAgent:
         self.max_candidates = max_candidates
         self.protect_baseline = protect_baseline
         self.rerank_enabled = rerank_enabled
+        self.tracer = tracer
 
         graph = StateGraph(AgentState)
-        graph.add_node("decide_search", self.decide_search)
-        graph.add_node("search", self.search)
-        graph.add_node("rerank", self.rerank)
-        graph.add_node("answer", self.answer_node)
+        graph.add_node("decide_search", self._wrap_node("agent.decide_search", self.decide_search))
+        graph.add_node("search", self._wrap_node("agent.search", self.search))
+        graph.add_node("rerank", self._wrap_node("agent.rerank", self.rerank))
+        graph.add_node("answer", self._wrap_node("agent.answer", self.answer_node))
         graph.add_edge(START, "decide_search")
         graph.add_edge("decide_search", "search")
         graph.add_conditional_edges(
@@ -179,12 +182,46 @@ class LangGraphAgent:
             "answer": answer or "I could not find the answer in the provided context.",
         }
 
-    def run(self, question: str, top_k: int | None = None) -> Dict[str, Any]:
+    def run(
+        self,
+        question: str,
+        top_k: int | None = None,
+        trace_metadata: Dict[str, Any] | None = None,
+    ) -> Dict[str, Any]:
         initial_state: AgentState = {"question": question}
         if top_k is not None:
             initial_state["forced_top_k"] = top_k
-        state = self.graph.invoke(initial_state)
+        observation_context = (
+            self.tracer.observation(
+                "langgraph.agent",
+                input_data=question,
+                metadata={
+                    **(trace_metadata or {}),
+                    "top_k_requested": top_k,
+                    "max_candidates": self.max_candidates,
+                    "protect_baseline": self.protect_baseline,
+                    "rerank_enabled": self.rerank_enabled,
+                },
+            )
+            if self.tracer is not None
+            else nullcontext(None)
+        )
+        trace_id = None
+        with observation_context as trace:
+            if trace is not None:
+                trace_id = trace.trace_id
+            state = self.graph.invoke(initial_state)
+            if trace is not None:
+                trace.update(
+                    metadata=self._node_metadata("agent.result", state),
+                    **(
+                        {"output": state.get("answer", "")}
+                        if self.tracer.capture_content
+                        else {}
+                    ),
+                )
         return {
+            "langfuse_trace_id": trace_id,
             "answer": state.get("answer", "I could not find the answer in the provided context."),
             "retrieved_documents": state.get("documents", []),
             "search_query": state.get("search_query"),
@@ -208,6 +245,67 @@ class LangGraphAgent:
                 for document in state.get("documents", [])
             ],
         }
+
+    def _wrap_node(self, name: str, node):
+        def traced_node(state: AgentState) -> AgentState:
+            if self.tracer is None:
+                return node(state)
+            with self.tracer.observation(
+                name,
+                input_data={"question": state.get("question")},
+                metadata={"node": name.rsplit(".", 1)[-1]},
+            ) as observation:
+                result = node(state)
+                observation.update(
+                    metadata=self._node_metadata(name, result),
+                    **(
+                        {"output": result.get("answer", "")}
+                        if self.tracer.capture_content and name.endswith("answer")
+                        else {}
+                    ),
+                )
+                return result
+
+        return traced_node
+
+    def _node_metadata(self, name: str, state: AgentState) -> Dict[str, Any]:
+        metadata: Dict[str, Any] = {}
+        for key in (
+            "search_type",
+            "top_k",
+            "candidate_k",
+            "use_rerank",
+            "candidate_count_after_search",
+            "candidate_count_after_rerank",
+            "final_count",
+        ):
+            if key in state:
+                metadata[key] = state[key]
+        if self.tracer is not None and self.tracer.capture_content and "search_query" in state:
+            metadata["search_query"] = state["search_query"]
+        documents = state.get("documents", [])
+        if documents:
+            metadata["documents"] = [
+                self._document_reference(document)
+                for document in documents
+            ]
+        metadata["stage"] = name.rsplit(".", 1)[-1]
+        return metadata
+
+    @staticmethod
+    def _document_reference(document: Dict[str, Any]) -> Dict[str, Any]:
+        reference = {
+            key: document.get(key)
+            for key in ("chunk_id", "source", "page", "backend")
+            if document.get(key) is not None
+        }
+        score = document.get("score")
+        if score is not None:
+            try:
+                reference["score"] = float(score)
+            except (TypeError, ValueError):
+                pass
+        return reference
 
 
     @staticmethod

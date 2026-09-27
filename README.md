@@ -110,7 +110,40 @@ Then edit .env:
 OPENAI_API_KEY=your_key_here
 
 API_URL=http://backend:8000
+
+# Optional Langfuse tracing
+LANGFUSE_PUBLIC_KEY=your_public_key
+LANGFUSE_SECRET_KEY=your_secret_key
+LANGFUSE_BASE_URL=https://cloud.langfuse.com
 ```
+
+Langfuse tracing is disabled by default. Enable it for an agent evaluation with
+`--langfuse`. Questions, prompts, retrieved text, and answers are not sent by
+default; pass `--capture-content` only for a controlled evaluation when those
+contents are safe to transmit.
+
+```bash
+python packages/rag-core/scripts/eval_agent.py \
+  --evaluation-csv packages/rag-core/src/rag_core/evaluation/dataset.csv \
+  --top-k 5 \
+  --skip-ragas \
+  --limit 1 \
+  --langfuse
+```
+
+Use `--capture-content` to include question/prompt/context/answer text in the
+trace. Keep Langfuse credentials in the local `.env`; never commit them.
+
+The evaluation attaches numeric scores to each trace when values are available:
+`retrieval_precision_at_k`, `retrieval_recall_at_k`, `faithfulness`,
+`answer_relevancy`, `context_precision`, and `context_recall`. Missing or
+non-finite metric values are skipped. Each evaluation row also stores its
+`langfuse_trace_id` in the output JSON for correlation.
+
+In Langfuse, use **Score Analytics** to inspect or filter these score names. To
+build a persistent chart, add a score-based widget to a custom dashboard and
+filter by trace metadata such as `topic` or `question_id`.
+
 ## Usage
 
 ### Run with Docker

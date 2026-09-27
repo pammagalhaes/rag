@@ -21,8 +21,9 @@ class TransformersClient(ModelClient):
     DEFAULT_OPENROUTER_EMBED_MODEL = "openai/text-embedding-3-small"
     DEFAULT_OPENROUTER_CHAT_MODEL = "openai/gpt-4o-mini"
 
-    def __init__(self, temperature: float = 0.0):
+    def __init__(self, temperature: float = 0.0, tracer=None):
         self.temperature = float(temperature)
+        self.tracer = tracer
         openrouter_key = os.getenv("OPENROUTER_API_KEY")
         openai_key = os.getenv("OPENAI_API_KEY")
 
@@ -69,6 +70,31 @@ class TransformersClient(ModelClient):
         - OpenRouter backend uses the OpenAI-compatible `chat.completions` endpoint,
           which is the only chat-style endpoint exposed by OpenRouter.
         """
+        if self.tracer is None:
+            output, _ = self._generate(prompt, max_tokens)
+            return output
+
+        with self.tracer.observation(
+            "llm.generate",
+            as_type="generation",
+            input_data=prompt,
+            model=self.chat_model,
+            model_parameters={
+                "temperature": self.temperature,
+                "max_tokens": max_tokens,
+            },
+            metadata={"backend": self.backend},
+        ) as generation:
+            output, usage_details = self._generate(prompt, max_tokens)
+            update = {"metadata": {"output_characters": len(output)}}
+            if usage_details:
+                update["usage_details"] = usage_details
+            if self.tracer.capture_content:
+                update["output"] = output
+            generation.update(**update)
+            return output
+
+    def _generate(self, prompt: str, max_tokens: int):
         if self.backend == "openai":
             response = self.client.responses.create(
                 model=self.chat_model,
@@ -76,13 +102,33 @@ class TransformersClient(ModelClient):
                 max_output_tokens=max_tokens,
                 temperature=self.temperature,
             )
-            return response.output_text
+            return response.output_text, self._usage_details(response)
 
-        # openrouter (chat.completions)
         response = self.client.chat.completions.create(
             model=self.chat_model,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=max_tokens,
             temperature=self.temperature,
         )
-        return response.choices[0].message.content or ""
+        return response.choices[0].message.content or "", self._usage_details(response)
+
+    @staticmethod
+    def _usage_details(response):
+        usage = getattr(response, "usage", None)
+        if usage is None:
+            return None
+        if hasattr(usage, "model_dump"):
+            usage = usage.model_dump()
+        elif not isinstance(usage, dict):
+            usage = vars(usage)
+
+        token_fields = {
+            "input_tokens": usage.get("input_tokens", usage.get("prompt_tokens")),
+            "output_tokens": usage.get("output_tokens", usage.get("completion_tokens")),
+            "total_tokens": usage.get("total_tokens"),
+        }
+        return {
+            key: int(value)
+            for key, value in token_fields.items()
+            if value is not None
+        } or None

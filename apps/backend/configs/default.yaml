@@ -22,6 +22,10 @@ agent:
   enabled: false
   max_candidates: 10
 
+observability:
+  langfuse_enabled: false
+  capture_content: false
+
 
 api:
   rate_limit_per_minute: 60

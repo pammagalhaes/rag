@@ -5,6 +5,8 @@ Example script: Evaluate RAG responses using RAGAS.
 
 import os
 import sys
+import json
+import math
 from typing import List, Dict, Any
 
 from dotenv import load_dotenv
@@ -54,6 +56,28 @@ def load_evaluation_dataset(csv_path: str) -> List[Dict[str, Any]]:
         raise ValueError(f"Evaluation CSV is missing required columns: {missing_columns}")
 
     return df.to_dict(orient="records")
+
+
+def _valid_metric_count(results: List[Any], metric_name: str) -> int:
+    return sum(
+        1
+        for result in results
+        if getattr(result, metric_name, None) is not None
+        and math.isfinite(float(getattr(result, metric_name)))
+    )
+
+
+def _metric_summary(results: List[Any], metric_name: str) -> Dict[str, Any]:
+    values = [
+        float(getattr(result, metric_name))
+        for result in results
+        if getattr(result, metric_name, None) is not None
+        and math.isfinite(float(getattr(result, metric_name)))
+    ]
+    return {
+        "valid_rows": len(values),
+        "mean": sum(values) / len(values) if values else None,
+    }
 
 
 def generate_rag_responses(
@@ -327,6 +351,33 @@ def main():
 
     os.makedirs(os.path.dirname(args.output), exist_ok=True)
     evaluator.export_results(results, args.output)
+    summary_path = f"{os.path.splitext(args.output)[0]}_summary.json"
+    metric_names = (
+        "faithfulness",
+        "answer_relevancy",
+        "context_precision",
+        "context_recall",
+    )
+    with open(summary_path, "w", encoding="utf-8") as file:
+        json.dump(
+            {
+                "rows_evaluated": len(results),
+                "ragas": {
+                    metric: _metric_summary(results, metric)
+                    for metric in metric_names
+                },
+            },
+            file,
+            indent=2,
+        )
+    print(f"RAGAS summary exported to {summary_path}")
+    print(
+        "Valid RAGAS rows: "
+        + ", ".join(
+            f"{metric}={_valid_metric_count(results, metric)}"
+            for metric in metric_names
+        )
+    )
 
 
 if __name__ == "__main__":

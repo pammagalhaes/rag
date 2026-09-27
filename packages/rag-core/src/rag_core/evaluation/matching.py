@@ -139,13 +139,13 @@ def compute_retrieval_metrics(
     Returns (precision_at_k, recall_at_k, k) or (None, None, None) when no
     retrieved documents / expected targets are available.
     """
-    retrieved_documents = qa.get("retrieved_documents") or []
-    if not retrieved_documents:
-        return None, None, None
-
     targets = expected_targets(qa)
     if not targets:
         return None, None, None
+
+    retrieved_documents = qa.get("retrieved_documents") or []
+    if not retrieved_documents:
+        return 0.0, 0.0, 0
 
     k = normalize_optional_int(qa.get("top_k"))
     if k is None:

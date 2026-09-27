@@ -150,11 +150,10 @@ class RAGEvaluator:
         for qa in qa_pairs:
             records.append(
                 {
-                    "question": qa["question"],
-                    "answer": qa["answer"],
-                    "contexts": qa.get("contexts", []),
+                    "user_input": qa["question"],
+                    "response": qa["answer"],
                     "retrieved_contexts": qa.get("contexts", []),
-                    "ground_truth": qa["ground_truth"],
+                    "reference": qa["ground_truth"],
                 }
             )
 
@@ -212,17 +211,6 @@ class RAGEvaluator:
                 for qa in qa_pairs
             ]
 
-
-def _finite_or_none(value: Any) -> Optional[float]:
-    """Convert RAGAS NaN/inf outputs into explicit missing values."""
-    if value is None:
-        return None
-    try:
-        value = float(value)
-    except (TypeError, ValueError):
-        return None
-    return value if math.isfinite(value) else None
-
     def print_results(self, results: List[EvaluationResult]) -> None:
         """Print evaluation results in a human-readable format."""
         print("\n" + "=" * 80)
@@ -273,3 +261,14 @@ def _finite_or_none(value: Any) -> Optional[float]:
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
         print(f"Results exported to {output_path}")
+
+
+def _finite_or_none(value: Any) -> Optional[float]:
+    """Convert RAGAS NaN/inf outputs into explicit missing values."""
+    if value is None:
+        return None
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return None
+    return value if math.isfinite(value) else None
